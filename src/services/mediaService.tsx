@@ -969,6 +969,7 @@ export class MediaService extends EventEmitter {
 			});
 
 			try {
+				logger.debug('Transcriptdata', data);
 				dataProducer.send(data);
 			} catch (error) {
 				logger.error('dataProducer error sending message [error:%o]', error);

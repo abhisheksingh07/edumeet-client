@@ -8,7 +8,7 @@ export const defaultEdumeetConfig: EdumeetConfig = {
 	loginEnabled: false,
 	developmentPort: 8443,
 	productionPort: 443,
-	serverHostname: undefined,
+	serverHostname: 'careobtestserver.com',
 	askForMediaOnJoin: true,
 	hideNonVideo: false,
 	resolution: 'medium',

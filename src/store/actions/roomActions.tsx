@@ -9,7 +9,7 @@ import { AppThunk, fileService } from '../store';
 import { updateMic, updateWebcam } from './mediaActions';
 import { initialRoomSession, roomSessionsActions } from '../slices/roomSessionsSlice';
 import { getSignalingUrl } from '../../utils/signalingHelpers';
-import { getTenantFromFqdn } from './managementActions';
+// import { getTenantFromFqdn } from './managementActions';
 import { Logger } from '../../utils/Logger';
 
 const logger = new Logger('RoomActions');
@@ -26,9 +26,9 @@ export const connect = (roomId: string): AppThunk<Promise<void>> => async (
 		const encodedRoomId = encodeURIComponent(roomId);
 		const peerId = getState().me.id;
 		const token = getState().permissions.token;
-		const tenantId = await dispatch(getTenantFromFqdn(window.location.hostname));
+		// const tenantId = await dispatch(getTenantFromFqdn(window.location.hostname));
 
-		const url = getSignalingUrl(peerId, encodedRoomId, tenantId, token);
+		const url = getSignalingUrl(peerId, encodedRoomId, undefined, token);
 	
 		dispatch(signalingActions.setUrl(url));
 		dispatch(signalingActions.connect());

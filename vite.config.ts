@@ -22,7 +22,7 @@ export default defineConfig({
 	server: {
 		https: true,
 		port: 4443,
-		host: true,
+		host: 'careobtestclient.com',
 		hmr: {
 			path: '/vite/'
 		}

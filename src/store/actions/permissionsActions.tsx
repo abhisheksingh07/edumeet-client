@@ -2,23 +2,23 @@ import { permissionsActions } from '../slices/permissionsSlice';
 import { AppThunk } from '../store';
 import { roomActions } from '../slices/roomSlice';
 import { lobbyPeersActions } from '../slices/lobbyPeersSlice';
-import { getTenantFromFqdn } from './managementActions';
+// import { getTenantFromFqdn } from './managementActions';
 import { Logger } from '../../utils/Logger';
 
 const logger = new Logger('LoginActions');
 
 export const login = (): AppThunk<Promise<void>> => async (
-	dispatch,
+	// dispatch,
 	_getState,
 	{ config }
 ): Promise<void> => {
-	logger.debug('login()');
+	logger.debug('login()', config.managementUrl);
 
-	const tenantId = await dispatch(getTenantFromFqdn(window.location.hostname));
+	// const tenantId = await dispatch(getTenantFromFqdn(window.location.hostname));
 
-	if (!tenantId) return logger.error('login() | no tenant found');
+	// if (!tenantId) return logger.error('login() | no tenant found');
 
-	window.open(`${config.managementUrl}/oauth/tenant?tenantId=${tenantId}`, 'loginWindow');
+	// window.open(`${config.managementUrl}/oauth/tenant?tenantId=${tenantId}`, 'loginWindow');
 };
 
 export const adminLogin = (email: string, password:string): AppThunk<Promise<void>> => async (
