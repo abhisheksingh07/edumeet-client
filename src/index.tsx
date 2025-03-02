@@ -38,6 +38,7 @@ const basename = window.location.pathname.split('/')
 	.slice(0, -1)
 	.join('/');
 
+console.log("basem	name", basename);
 logger.debug('Starting app [baseUrl:%s]', basename);
 
 const router = createBrowserRouter(

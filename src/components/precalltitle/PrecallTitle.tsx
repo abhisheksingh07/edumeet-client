@@ -9,18 +9,13 @@ import { checkJWT } from '../../store/actions/permissionsActions';
 
 const PrecallTitle = (): React.JSX.Element => {
 	const dispatch = useAppDispatch();
-
 	const logo = useAppSelector((state) => state.room.logo);
 	const loginEnabled = useAppSelector((state) => state.permissions.loginEnabled);
-	let loggedIn = useAppSelector((state) => state.permissions.loggedIn);
+    const loggedIn = useAppSelector((state) => state.permissions.loggedIn);
 
-	useEffect(() => {
-
-		dispatch(checkJWT()).then(() => {
-			loggedIn = useAppSelector((state) => state.permissions.loggedIn);
-		});
-
-	}, []);
+    useEffect(() => {
+        dispatch(checkJWT());
+    }, [dispatch]);
 
 	return (
 		<Grid

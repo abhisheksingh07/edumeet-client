@@ -29,7 +29,7 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			'webtorrent': 'webtorrent/dist/webtorrent.min.js',
+			'webtorrent': 'webtorrent/dist/webtorrent.min.js'
 		},
 	},
 	build: {

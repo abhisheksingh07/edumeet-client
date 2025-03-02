@@ -124,7 +124,7 @@ export const localeList = [
 const cache = createIntlCache();
 
 export let intl = createIntl({
-	locale: 'en-US',
+	locale: 'en',
 }, cache);
 
 /**

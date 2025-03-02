@@ -25,7 +25,8 @@ export const connect = (roomId: string): AppThunk<Promise<void>> => async (
 	try {
 		const encodedRoomId = encodeURIComponent(roomId);
 		const peerId = getState().me.id;
-		const token = getState().permissions.token;
+		const token = getState().permissions.token || window.location.href.split('token=')[1];
+
 		// const tenantId = await dispatch(getTenantFromFqdn(window.location.hostname));
 
 		const url = getSignalingUrl(peerId, encodedRoomId, undefined, token);
@@ -51,9 +52,9 @@ export const joinRoom = (): AppThunk<Promise<void>> => async (
 	{ signalingService, mediaService /* , performanceMonitor */ }
 ): Promise<void> => {
 	logger.debug('joinRoom()');
-
+    
 	dispatch(meActions.setLocalCapabilities(mediaService.localCapabilities));
-
+    const token = window.location.href.split('token=')[1];
 	const displayName = getState().settings.displayName;
 	const { sessionId, picture } = getState().me;
 
@@ -63,12 +64,12 @@ export const joinRoom = (): AppThunk<Promise<void>> => async (
 		chatHistory,
 		fileHistory,
 		countdownTimer,
-		breakoutRooms,
 		locked,
 		lobbyPeers,
 	} = await signalingService.sendRequest('join', {
 		displayName,
 		picture,
+		token
 	});
 
 	fileService.tracker = tracker;
@@ -76,7 +77,8 @@ export const joinRoom = (): AppThunk<Promise<void>> => async (
 
 	batch(() => {
 		dispatch(permissionsActions.setLocked(Boolean(locked)));
-		dispatch(roomSessionsActions.addRoomSessions(breakoutRooms));
+		dispatch(permissionsActions.setToken(token));
+		// dispatch(roomSessionsActions.addRoomSessions(breakoutRooms));
 		dispatch(peersActions.addPeers(peers));
 		dispatch(lobbyPeersActions.addPeers(lobbyPeers));
 		dispatch(roomSessionsActions.addMessages({ sessionId, messages: chatHistory }));
