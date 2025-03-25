@@ -1,152 +1,173 @@
-import EventEmitter from 'events';
-import { SocketMessage } from './types';
-import { Logger } from './Logger';
-import { SocketTimeoutError } from './signalingHelpers';
-import type { Socket } from 'socket.io-client';
+import EventEmitter from "events";
+import { SocketMessage } from "./types";
+import { Logger } from "./Logger";
+import { SocketTimeoutError } from "./signalingHelpers";
+import type { Socket } from "socket.io-client";
 
 interface ClientServerEvents {
-	/* eslint-disable no-unused-vars */
-	notification: (notification: SocketMessage) => void;
-	request: (request: SocketMessage, result: (
-		serverError: unknown | null,
-		responseData: unknown) => void
-	) => void;
-	/* eslint-enable no-unused-vars */
+  /* eslint-disable no-unused-vars */
+  notification: (notification: SocketMessage) => void;
+  request: (
+    request: SocketMessage,
+    result: (serverError: unknown | null, responseData: unknown) => void
+  ) => void;
+  /* eslint-enable no-unused-vars */
+  /* eslint-enable no-unused-vars */
+  error: (error: Error) => void;
 }
 
 interface ServerClientEvents {
-	/* eslint-disable no-unused-vars */
-	notification: (notification: SocketMessage) => void;
-	request: (request: SocketMessage, result: (
-		timeout: Error | null,
-		serverError: unknown | null,
-		responseData: unknown) => void
-	) => void;
-	/* eslint-enable no-unused-vars */
+  /* eslint-disable no-unused-vars */
+  notification: (notification: SocketMessage) => void;
+  request: (
+    request: SocketMessage,
+    result: (
+      timeout: Error | null,
+      serverError: unknown | null,
+      responseData: unknown
+    ) => void
+  ) => void;
+  /* eslint-enable no-unused-vars */
 }
 
-const logger = new Logger('RoomServerConnection');
+const logger = new Logger("RoomServerConnection");
 
 export class RoomServerConnection extends EventEmitter {
-	public id?: string;
+  public id?: string;
 
-	public static async create({ url }: { url: string}): Promise<RoomServerConnection> {
-		logger.debug('create() [url:%s]', url);
-	
-		const { io } = await import('socket.io-client');
+  public static async create({
+    url,
+  }: {
+    url: string;
+  }): Promise<RoomServerConnection> {
+    logger.debug("create() [url:%s]", url);
 
-		const socket = io(url, {
-			transports: [ 'websocket', 'polling' ],
-			rejectUnauthorized: true,
-			closeOnBeforeunload: false,
-			reconnection: false
-		});
-	
-		return new RoomServerConnection(socket);
-	}
+    const { io } = await import("socket.io-client");
 
-	public closed = false;
-	private socket: Socket<ClientServerEvents, ServerClientEvents>;
+    const socket = io(url, {
+      transports: ["websocket", "polling"],
+      rejectUnauthorized: true,
+      closeOnBeforeunload: false,
+      reconnection: false,
+    });
 
-	constructor(socket: Socket<ClientServerEvents, ServerClientEvents>) {
-		super();
+    return new RoomServerConnection(socket);
+  }
 
-		logger.debug('constructor()');
+  public closed = false;
+  private socket: Socket<ClientServerEvents, ServerClientEvents>;
 
-		this.socket = socket;
-		this.id = socket.id;
-		this.handleSocket();
-	}
+  constructor(socket: Socket<ClientServerEvents, ServerClientEvents>) {
+    super();
 
-	public close(): void {
-		logger.debug('close() [id: %s]', this.id);
+    logger.debug("constructor()");
 
-		this.closed = true;
+    this.socket = socket;
+    this.id = socket.id;
+    this.handleSocket();
+  }
 
-		if (this.socket.connected)
-			this.socket.disconnect();
-		this.socket.io.off();
+  public close(): void {
+    this.closed = true;
+    if (this.socket.connected) this.socket.disconnect();
+    this.socket.io.off();
+    this.socket.removeAllListeners();
+    this.emit("close");
+  }
 
-		this.socket.removeAllListeners();
+  public notify(notification: SocketMessage): void {
+    logger.debug(
+      "notification() socket message [notification: %o]",
+      notification
+    );
 
-		this.emit('close');
-	}
+    this.socket.emit("notification", notification);
+  }
 
-	public notify(notification: SocketMessage): void {
-		logger.debug('notification() [notification: %o]', notification);
+  private sendRequestOnWire(socketMessage: SocketMessage): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) {
+        reject("No socket connection");
+      } else {
+        this.socket
+          .timeout(1500)
+          .emit("request", socketMessage, (timeout, serverError, response) => {
+            if (timeout) reject(new SocketTimeoutError("Request timed out"));
+            else if (serverError) reject(serverError);
+            else resolve(response);
+          });
+      }
+    });
+  }
 
-		this.socket.emit('notification', notification);
-	}
+  public async request(request: SocketMessage): Promise<unknown> {
+    logger.debug("sendRequest() [request: %o]", request);
 
-	private sendRequestOnWire(socketMessage: SocketMessage): Promise<unknown> {
-		return new Promise((resolve, reject) => {
-			if (!this.socket) {
-				reject('No socket connection');
-			} else {
-				this.socket.timeout(1500).emit('request', socketMessage, (timeout, serverError, response) => {
-					if (timeout) reject(new SocketTimeoutError('Request timed out'));
-					else if (serverError) reject(serverError);
-					else resolve(response);
-				});
-			}
-		});
-	}
+    for (let tries = 0; tries < 3; tries++) {
+      try {
+        return await this.sendRequestOnWire(request);
+      } catch (error) {
+        if (error instanceof SocketTimeoutError) {
+          logger.warn(
+            "sendRequest() timeout, retrying [attempt: %s]",
+            tries + 1
+          );
+          this.emit("error", new Error("Socket timeout"));
+        } else throw error;
+      }
+    }
+  }
 
-	public async request(request: SocketMessage): Promise<unknown> {
-		logger.debug('sendRequest() [request: %o]', request);
+  private handleSocket(): void {
+    logger.debug("handleSocket() room connection");
 
-		for (let tries = 0; tries < 3; tries++) {
-			try {
-				return await this.sendRequestOnWire(request);
-			} catch (error) {
-				if (error instanceof SocketTimeoutError) {
-					logger.warn('sendRequest() timeout, retrying [attempt: %s]', tries + 1);
-					this.emit('error', new Error('Socket timeout'));
-				} else
-					throw error;
-			}
-		}
-	}
+    this.socket.on("connect", () => {
+      logger.debug("handleSocket() connected on socket");
 
-	private handleSocket(): void {
-		logger.debug('handleSocket()');
+      if (this.socket.recovered) {
+        logger.debug("handleSocket() reconnected on socket");
+        this.emit("reconnected");
+      } else {
+        logger.debug("handleSocket() connected on again socket");
+        this.emit("connect");
+      }
+    });
 
-		this.socket.on('connect', () => {
-			logger.debug('handleSocket() connected');
+    this.socket.once("disconnect", () => {
+      logger.debug("socket disconnected");
+    });
 
-			if (this.socket.recovered) {
-				this.emit('reconnected');
-			} else {
-				this.emit('connect');
-			}
-		});
+    this.socket.on("error", (error) => {
+      logger.debug("socket error event: %o", error);
+      this.emit("error", error);
+    });
 
-		this.socket.once('disconnect', () => {
-			logger.debug('socket disconnected');
-		});
+    this.socket.on("notification", (notification) => {
+      logger.debug(
+        '"notification room server" event [notification: %o]',
+        notification
+      );
 
-		this.socket.on('notification', (notification) => {
-			logger.debug('"notification" event [notification: %o]', notification);
+      this.emit("notification", notification);
+    });
 
-			this.emit('notification', notification);
-		});
+    this.socket.on("request", (request, result) => {
+      logger.debug('"request" event [request: %o]', request);
 
-		this.socket.on('request', (request, result) => {
-			logger.debug('"request" event [request: %o]', request);
+      this.emit(
+        "request",
+        request,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (response: any) => result(null, response),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (error: any) => result(error, null)
+      );
+    });
 
-			this.emit(
-				'request',
-				request,
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				(response: any) => result(null, response),
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				(error: any) => result(error, null)
-			);
-		});
-
-		// Listen and re-transmit events from manager.
-		this.socket.io.on('error', (error: Error) => {
-			this.emit('error', (error));
-		});
-	}
+    // Listen and re-transmit events from manager.
+    this.socket.io.on("error", (error: Error) => {
+      logger.debug("socket error event: %o", error);
+      this.emit("error", error);
+    });
+  }
 }

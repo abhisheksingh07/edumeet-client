@@ -935,7 +935,7 @@ export class MediaService extends EventEmitter {
 		const dataProducer = await this.produceData({
 			ordered: false,
 			maxPacketLifeTime: 3000,
-			label: 'transcription',
+			label: 'transcription'
 		});
 
 		this.speechRecognition = new window.webkitSpeechRecognition();

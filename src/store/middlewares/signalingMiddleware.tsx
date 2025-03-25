@@ -1,75 +1,81 @@
-import { Middleware } from '@reduxjs/toolkit';
-import { signalingActions } from '../slices/signalingSlice';
-import { AppDispatch, MiddlewareOptions, RootState } from '../store';
-import { roomServerConnectionError } from '../../components/translated/translatedComponents';
-import { notificationsActions } from '../slices/notificationsSlice';
-import { RoomServerConnection } from '../../utils/RoomServerConnection';
-import { leaveRoom } from '../actions/roomActions';
-import { Logger } from '../../utils/Logger';
+import { Middleware } from "@reduxjs/toolkit";
+import { signalingActions } from "../slices/signalingSlice";
+import { AppDispatch, MiddlewareOptions, RootState } from "../store";
+import { roomServerConnectionError } from "../../components/translated/translatedComponents";
+import { notificationsActions } from "../slices/notificationsSlice";
+import { RoomServerConnection } from "../../utils/RoomServerConnection";
+import { leaveRoom } from "../actions/roomActions";
+import { Logger } from "../../utils/Logger";
 
-const logger = new Logger('SignalingMiddleware');
+const logger = new Logger("SignalingMiddleware");
 
 /**
  * This middleware represents the connection between the
  * SignalingService, the Redux store and the React components.
- * 
+ *
  * It listens to the SignalingService events and dispatches
  * the corresponding Redux actions.
- * 
+ *
  * It also listens to the Redux actions and calls the
  * SignalingService methods.
- * 
+ *
  * This way the SignalingService and the Redux store are
  * kept in sync.
- * 
+ *
  * @param options - Middleware options.
  * @returns {Middleware} Redux middleware.
  */
 const createSignalingMiddleware = ({
-	signalingService 
+  signalingService,
 }: MiddlewareOptions): Middleware => {
-	logger.debug('createSignalingMiddleware()');
+  logger.debug("createSignalingMiddleware()");
 
-	const middleware: Middleware = ({
-		dispatch, getState
-	}: {
-		dispatch: AppDispatch,
-		getState: () => RootState
-	}) => (next) => (action) => {
-		if (signalingActions.connect.match(action)) {
-			signalingService.on('connected', () => {
-				dispatch(signalingActions.connected());
-			});
+  const middleware: Middleware =
+    ({
+      dispatch,
+      getState,
+    }: {
+      dispatch: AppDispatch;
+      getState: () => RootState;
+    }) =>
+    (next) =>
+    (action) => {
+      if (signalingActions.connect.match(action)) {
+        signalingService.on("connected", () => {
+          dispatch(signalingActions.connected());
+        });
 
-			signalingService.on('error', (error) => {
-				dispatch(notificationsActions.enqueueNotification({
-					message: roomServerConnectionError(error.message),
-					options: { variant: 'error' }
-				}));
-			});
+        signalingService.on("error", (error) => {
+          dispatch(
+            notificationsActions.enqueueNotification({
+              message: roomServerConnectionError(error.message),
+              options: { variant: "error" },
+            })
+          );
+        });
 
-			signalingService.once('close', () => {
-				dispatch(leaveRoom());
-			});
-				
-			const { url } = getState().signaling;
+        signalingService.once("close", () => {
+          dispatch(leaveRoom());
+        });
 
-			(async () => {
-				const socketConnection = await RoomServerConnection.create({ url });
+        const { url } = getState().signaling;
 
-				signalingService.addConnection(socketConnection);
-			})();
-		}
+        (async () => {
+          const socketConnection = await RoomServerConnection.create({ url });
 
-		if (signalingActions.disconnect.match(action)) {
-			signalingService.removeAllListeners();
-			signalingService.disconnect();
-		}
+          signalingService.addConnection(socketConnection);
+        })();
+      }
 
-		return next(action);
-	};
+      if (signalingActions.disconnect.match(action)) {
+        signalingService.removeAllListeners();
+        signalingService.disconnect();
+      }
 
-	return middleware;
+      return next(action);
+    };
+
+  return middleware;
 };
 
 export default createSignalingMiddleware;
