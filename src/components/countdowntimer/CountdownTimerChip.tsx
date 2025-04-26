@@ -1,18 +1,21 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Chip } from '@mui/material';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { uiActions } from '../../store/slices/uiSlice';
 import AvTimerIcon from '@mui/icons-material/AvTimer';
 import moment from 'moment';
+import { jwtDecode } from 'jwt-decode';
+import { setCountdownTimerInitialTime, enableCountdownTimer, startCountdownTimer } from '../../store/actions/countdownTimerActions';
+
 
 const CountdownTimerChip = (): JSX.Element => {
 	const dispatch = useAppDispatch();
+	enableCountdownTimer();
+	const jwtToken = useAppSelector((state) => state.permissions.token);
 	const isEnabled = useAppSelector((state) => state.room.countdownTimer.isEnabled);
 	const remainingTime = useAppSelector((state) => state.room.countdownTimer.remainingTime);
 	const initialTime = useAppSelector((state) => state.room.countdownTimer.initialTime);
-
 	const participantListOpen = useAppSelector((state) => state.ui.participantListOpen);
-
 	const openUsersTab = () => dispatch(uiActions.setUi({ participantListOpen: !participantListOpen }));
 
 	const secondsSet = moment.duration(initialTime).asSeconds();
@@ -24,28 +27,36 @@ const CountdownTimerChip = (): JSX.Element => {
 
 	switch (true) {
 		case percentage <= 100 && percentage >= 50: indicatorColor = '#2E7A27'; break;
-		case percentage < 	50 && percentage >= 20: indicatorColor = '#FFA500'; break;
-		case percentage < 	20: 					indicatorColor = '#FF0000'; break;
+		case percentage < 50 && percentage >= 20: indicatorColor = '#FFA500'; break;
+		case percentage < 20: indicatorColor = '#FF0000'; break;
 		default: indicatorColor = backgroundColor;
 	}
 
+	useEffect(() => {
+		const decodedToken = jwtToken ? jwtDecode(jwtToken) : null;
+		const { exp, nbf } = decodedToken as { exp: number, nbf: number }
+		const timeDifference = (exp - nbf) * 1000;
+		dispatch(setCountdownTimerInitialTime(moment.utc(timeDifference).format('HH:mm:ss')));
+		dispatch(startCountdownTimer());
+	}, [isEnabled])
+
 	return (
 		<>
-			{isEnabled && (
-				<Chip
-					sx={{
-						color: 'white',
-						backgroundColor: backgroundColor,
-						background: `linear-gradient(to right, ${indicatorColor} ${percentage}%, ${backgroundColor} ${percentage}%)`,
-						animation: `${percentage}% blink-animation 1s infinite`,
-						width: '86px',
-					}}
-					label={remainingTime}
-					size="small"
-					icon={<AvTimerIcon style={{ color: 'white' }} />}
-					onClick={() => openUsersTab()}
-				/>
-			)}
+
+			<Chip
+				sx={{
+					color: 'white',
+					backgroundColor: backgroundColor,
+					background: `linear-gradient(to right, ${indicatorColor} ${percentage}%, ${backgroundColor} ${percentage}%)`,
+					animation: `${percentage}% blink-animation 1s infinite`,
+					width: '86px',
+				}}
+				label={remainingTime}
+				size="small"
+				icon={<AvTimerIcon style={{ color: 'white' }} />}
+				onClick={() => openUsersTab()}
+			/>
+
 		</>
 	);
 };

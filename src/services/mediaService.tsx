@@ -18,6 +18,9 @@ import { ProducerSource } from '../utils/types';
 import { MediaSender } from '../utils/mediaSender';
 import { Logger } from '../utils/Logger';
 import edumeetConfig from '../utils/edumeetConfig';
+import { store } from '../store/store';
+import { jwtDecode } from 'jwt-decode';
+import * as jwt from 'jsonwebtoken';
 
 const logger = new Logger('MediaService');
 
@@ -53,6 +56,11 @@ type MediaSenders = {
 	// eslint-disable-next-line no-unused-vars
 	[key in ProducerSource]: MediaSender;
 };
+
+export interface IExtendJWT extends jwt.JwtPayload {
+	email?: string;
+	displayName?: string;
+}
 
 export type Transcript = Omit<PeerTranscript, 'peerId'>;
 
@@ -124,7 +132,7 @@ export class MediaService extends EventEmitter {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private speechRecognition?: any;
 	private speechRecognitionRunning = false;
-	
+
 	// eslint-disable-next-line no-unused-vars
 	public rejectMediaReady!: (error: Error) => void;
 	public resolveMediaReady!: () => void;
@@ -157,7 +165,7 @@ export class MediaService extends EventEmitter {
 	constructor(
 		{ signalingService }: { signalingService: SignalingService },
 		// eslint-disable-next-line no-unused-vars
-		public readonly monitor?: ClientMonitor,		
+		public readonly monitor?: ClientMonitor,
 	) {
 		super();
 
@@ -297,7 +305,7 @@ export class MediaService extends EventEmitter {
 						const { peerId, rtpCapabilities } = notification.data;
 
 						const peerDevice = this.getPeerDevice(peerId);
-						
+
 						await peerDevice.load({ remoteRtpCapabilities: rtpCapabilities });
 
 						break;
@@ -317,7 +325,7 @@ export class MediaService extends EventEmitter {
 						const transport = await this.getPeerTransport(peerId, direction === 'send' ? 'recv' : 'send');
 
 						await transport.addIceCandidate({ candidate });
-						
+
 						break;
 					}
 
@@ -564,9 +572,16 @@ export class MediaService extends EventEmitter {
 
 							switch (method) {
 								case 'transcript': {
+									let token = '';
+									try {
+										token = store?.getState().permissions.token || '';
+									} catch (error) {
+										logger.error('Error accessing store: %o', error);
+									}
+									const decodedToken: IExtendJWT | null = token ? jwtDecode(token) : null;
 									const { transcript, id: transcriptionId, done } = data;
-
 									this.emit('transcript', { id: transcriptionId, transcript, peerId, done });
+									this.signalingService.notify('transcript', { id: transcriptionId, transcript, peerId, done, email: decodedToken?.email, displayName: decodedToken?.username });
 
 									break;
 								}
@@ -602,7 +617,7 @@ export class MediaService extends EventEmitter {
 
 							return;
 						}
-	
+
 						this.changeConsumer(consumerId, changeEvent[notification.method] as MediaChange, false);
 
 						break;
@@ -751,7 +766,7 @@ export class MediaService extends EventEmitter {
 
 	public async createTransports(): Promise<void> {
 		await this.mediaReady;
-		
+
 		this.sendTransport = await this.createTransport('createSendTransport');
 		this.recvTransport = await this.createTransport('createRecvTransport');
 
@@ -873,7 +888,7 @@ export class MediaService extends EventEmitter {
 				}
 
 				const monitor = await this.monitor;
-				
+
 				if (monitor)
 					monitor.collectors.addRTCPeerConnection(transport.handler.pc);
 
@@ -976,9 +991,8 @@ export class MediaService extends EventEmitter {
 			}
 
 			if (isFinal) { // We want to send the transcript now
-				logger.debug('speech final result [transcript:%s]', speechResult);
-
 				transcriptId = Math.round(Math.random() * 10000000);
+				// this.signalingService.notify('transcript', { transcript: speechResult, id: dataProducer.id, done: true });
 			} else
 				logger.debug('speech interim result [transcript:%s]', speechResult);
 		};
@@ -1017,3 +1031,5 @@ export class MediaService extends EventEmitter {
 		this.emit('transcriptionStopped');
 	}
 }
+
+

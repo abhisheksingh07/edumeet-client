@@ -14,6 +14,7 @@ import { SnackbarKey, SnackbarProvider, useSnackbar } from 'notistack';
 import { IconButton } from '@mui/material';
 import { Close } from '@mui/icons-material';
 import { meActions } from './store/slices/meSlice';
+import { permissionsActions } from './store/slices/permissionsSlice';
 
 type AppParams = {
 	id: string;
@@ -36,6 +37,7 @@ const SnackbarCloseButton = ({
 };
 
 const App = (): JSX.Element => {
+	const token = window.location.href.split('token=')[1]
 	const backgroundImage = useAppSelector((state) => state.room.backgroundImage);
 	const dispatch = useAppDispatch();
 	const roomState = useAppSelector((state) => state.room.state);
@@ -44,6 +46,7 @@ const App = (): JSX.Element => {
 	const navigate = useNavigate();
 
 	useEffect(() => {
+		dispatch(permissionsActions.setToken(token));
 		dispatch(startListeners());
 
 		return () => {
